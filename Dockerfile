@@ -8,7 +8,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---------- 2. Go binary (UI embedded) ----------
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS api
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS api
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src
