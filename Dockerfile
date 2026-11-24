@@ -1,6 +1,6 @@
 # ---------- 1. React UI ----------
 # Build stages run on the build machine's architecture and cross-compile (fast multi-arch builds).
-FROM --platform=$BUILDPLATFORM node:22-alpine AS ui
+FROM --platform=$BUILDPLATFORM node:26-alpine AS ui
 WORKDIR /ui
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
