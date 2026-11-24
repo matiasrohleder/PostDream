@@ -1,0 +1,10 @@
+apiVersion: v2
+name: postdream
+description: SMTP sandbox with multi-tenant inboxes, web UI and API. Requires an external PostgreSQL.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/matiasrohleder/PostDream
+sources:
+  - https://github.com/matiasrohleder/PostDream
+keywords: [smtp, email, testing, sandbox, postdream]

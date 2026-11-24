@@ -1,0 +1,23 @@
+# Postgres only, for running the Go backend from source (VS Code / `make dev-api`).
+#   docker compose -f docker-compose.dev.yml up -d
+name: postdream-dev
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postdream
+      POSTGRES_PASSWORD: postdream
+      POSTGRES_DB: postdream
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postdream -d postdream"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata-dev:

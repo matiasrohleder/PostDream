@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "postdream.fullname" . }}
+  labels: {{- include "postdream.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels: {{- include "postdream.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "postdream.selector" . | nindent 8 }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
+    spec:
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: postdream
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 8025 }
+            - { name: smtp, containerPort: 1025 }
+            {{- if .Values.env.POP3_ADDR }}
+            - { name: pop3, containerPort: 1110 }
+            {{- end }}
+          env:
+            - { name: ADMIN_EMAIL, value: {{ .Values.admin.email | quote }} }
+            {{- range $k, $v := .Values.env }}
+            - { name: {{ $k }}, value: {{ $v | quote }} }
+            {{- end }}
+            {{- if .Values.database.existingSecret }}
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: {{ .Values.database.existingSecret }}, key: DATABASE_URL } }
+            {{- end }}
+            {{- if .Values.admin.existingSecret }}
+            - name: ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ .Values.admin.existingSecret }}, key: ADMIN_PASSWORD } }
+            {{- end }}
+          envFrom:
+            - secretRef: { name: {{ include "postdream.fullname" . }} }
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

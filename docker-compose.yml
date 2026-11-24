@@ -1,0 +1,82 @@
+# PostDream: SMTP sandbox + web UI.
+#   docker compose up -d --build
+#   UI:   http://localhost:8025
+#   SMTP: localhost:1025   POP3: localhost:1110
+#
+# Optional spam scoring with Rspamd:
+#   RSPAMD_URL=http://rspamd:11333 docker compose --profile spam up -d --build
+name: postdream
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postdream
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postdream}
+      POSTGRES_DB: postdream
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postdream -d postdream"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postdream:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-0.1.0}
+    image: postdream:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${SMTP_PORT:-1025}:1025"
+      - "${HTTP_PORT:-8025}:8025"
+      - "${POP3_PORT:-1110}:1110"
+    environment:
+      DATABASE_URL: postgres://postdream:${POSTGRES_PASSWORD:-postdream}@db:5432/postdream?sslmode=disable
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@postdream.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      SMTP_AUTH: ${SMTP_AUTH:-optional}
+      SMTP_HOSTNAME: ${SMTP_HOSTNAME:-postdream}
+      SMTP_MAX_MESSAGE_BYTES: ${SMTP_MAX_MESSAGE_BYTES:-26214400}
+      SMTP_TLS_CERT: ${SMTP_TLS_CERT:-}
+      SMTP_TLS_KEY: ${SMTP_TLS_KEY:-}
+      DEFAULT_INBOX: ${DEFAULT_INBOX:-default}
+      DEFAULT_INBOX_SMTP_PASSWORD: ${DEFAULT_INBOX_SMTP_PASSWORD:-}
+      RETENTION_HOURS: ${RETENTION_HOURS:-72}
+      RETENTION_INTERVAL: ${RETENTION_INTERVAL:-10m}
+      MAX_MESSAGES_PER_INBOX: ${MAX_MESSAGES_PER_INBOX:-0}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      SESSION_TTL: ${SESSION_TTL:-168h}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
+      SMTP_REQUIRE_TLS: ${SMTP_REQUIRE_TLS:-false}
+      SMTP_ALLOWED_RECIPIENTS: ${SMTP_ALLOWED_RECIPIENTS:-}
+      POP3_ADDR: ${POP3_ADDR-:1110}
+      JOB_WORKERS: ${JOB_WORKERS:-4}
+      OUTBOUND_ALLOW_PRIVATE: ${OUTBOUND_ALLOW_PRIVATE:-false}
+      OUTBOUND_ALLOWED_HOSTS: ${OUTBOUND_ALLOWED_HOSTS:-}
+      RSPAMD_URL: ${RSPAMD_URL:-}
+      RSPAMD_PASSWORD: ${RSPAMD_PASSWORD:-}
+      SPAMASSASSIN_ADDR: ${SPAMASSASSIN_ADDR:-}
+      RELAY_SMTP_URL: ${RELAY_SMTP_URL:-}
+      RELAY_FROM: ${RELAY_FROM:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      METRICS_ADDR: ${METRICS_ADDR:-}
+
+  # Optional: spam scoring (enable with --profile spam and RSPAMD_URL=http://rspamd:11333).
+  rspamd:
+    image: rspamd/rspamd:4.3
+    profiles: ["spam"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:

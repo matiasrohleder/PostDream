@@ -1,0 +1,9 @@
+PostDream {{ .Chart.AppVersion }} is starting.
+
+UI/API:  kubectl port-forward svc/{{ include "postdream.fullname" . }} 8025:{{ .Values.service.httpPort }}  ->  http://localhost:8025
+SMTP:    {{ include "postdream.fullname" . }}-smtp.{{ .Release.Namespace }}:{{ .Values.service.smtp.port }}
+{{- if not (or .Values.admin.password .Values.admin.existingSecret) }}
+
+The initial admin password was generated; find it with:
+  kubectl logs deploy/{{ include "postdream.fullname" . }} | grep "GENERATED password"
+{{- end }}
