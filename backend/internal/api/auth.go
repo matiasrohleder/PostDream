@@ -1,16 +1,43 @@
 package api
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"net/http"
 	"time"
 
+	"github.com/matiasrohleder/PostDream/internal/config"
 	"github.com/matiasrohleder/PostDream/internal/store"
 )
+
+// accessTokenUser is the principal of whoever presents ACCESS_TOKEN: full access, no account behind it.
+var accessTokenUser = &store.User{ID: "", Email: "access-token", Name: "Access token", Role: "admin"}
+
+// isAccessToken reports whether tok is the configured ACCESS_TOKEN (only in token mode).
+func (s *Server) isAccessToken(tok string) bool {
+	if s.cfg.AuthMode() != config.AuthModeToken {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(tok), []byte(s.cfg.AccessToken)) == 1
+}
+
+// accessCookie is the session cookie value for token mode. It is derived from the token so no session table is
+// needed, and changing ACCESS_TOKEN signs everybody out.
+func (s *Server) accessCookie() string {
+	sum := sha256.Sum256([]byte("postdream-access-cookie\x00" + s.cfg.AccessToken))
+	return hex.EncodeToString(sum[:])
+}
+
+func (s *Server) isAccessCookie(v string) bool {
+	return subtle.ConstantTimeCompare([]byte(v), []byte(s.accessCookie())) == 1
+}
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		Token    string `json:"token"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeErr(w, 400, "invalid body")
@@ -19,6 +46,24 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	ip := s.clientIP(r)
 	if s.loginLimiter.Blocked(ip) {
 		writeErr(w, 429, "too many failed attempts, try again later")
+		return
+	}
+	switch s.cfg.AuthMode() {
+	case config.AuthModeToken:
+		if !s.isAccessToken(body.Token) {
+			s.loginLimiter.Fail(ip)
+			writeErr(w, 401, "invalid access token")
+			return
+		}
+		s.loginLimiter.Reset(ip)
+		http.SetCookie(w, &http.Cookie{
+			Name: sessionCookie, Value: s.accessCookie(), Path: "/", HttpOnly: true, Secure: s.cfg.CookieSecure,
+			SameSite: http.SameSiteStrictMode, Expires: time.Now().Add(s.cfg.SessionTTL),
+		})
+		writeJSON(w, 200, accessTokenUser)
+		return
+	case config.AuthModeNone:
+		writeErr(w, 400, "login is disabled (AUTH_ENABLED=false)")
 		return
 	}
 	u, err := s.store.Authenticate(r.Context(), body.Email, body.Password)

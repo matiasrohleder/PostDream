@@ -63,7 +63,9 @@ flowchart LR
 
 ## Where to go next
 
-- **Try it in five minutes:** [Quick start](getting-started/quick-start.md).
+- **Try it right now:** `docker run --rm -p 8025:8025 -p 1025:1025 matiasrohleder/postdream:standalone`
+  ([Run it in one command](getting-started/one-command.md)).
+- **Set it up for a team:** [Quick start](getting-started/quick-start.md).
 - **Wire it into your project:** [Connect your app](getting-started/connect-your-app.md), then
   [E2E testing](integrations/e2e-testing.md).
 - **Run it for a team:** [Inboxes](administration/inboxes.md), [Users and roles](administration/users-and-roles.md)

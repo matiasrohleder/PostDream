@@ -23,7 +23,8 @@ point for Docker Compose. **Settings → Server** shows the effective values of 
 
 | Variable | Default | Description |
 |---|---|---|
-| `AUTH_ENABLED` | `true` | Require login in the UI |
+| `AUTH_ENABLED` | `true` | User accounts and login. `false` in the [standalone image](../getting-started/one-command.md) |
+| `ACCESS_TOKEN` | — | With `AUTH_ENABLED=false`: one shared key (8+ characters) for the UI and the API instead of user accounts. Ignored when `AUTH_ENABLED=true` |
 | `ADMIN_EMAIL` | `admin@postdream.local` | Initial admin (only with an empty database) |
 | `ADMIN_PASSWORD` | random, logged | Initial admin password |
 | `SESSION_TTL` | `168h` | Session lifetime |

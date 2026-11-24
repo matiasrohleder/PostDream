@@ -35,7 +35,7 @@ import (
 	"github.com/matiasrohleder/PostDream/web"
 )
 
-var version = "0.1.0-dev"
+var version = "0.2.0-dev"
 
 func main() {
 	level := slog.LevelInfo
@@ -128,7 +128,13 @@ func run() error {
 		errc <- smtpServer.Serve(smtpLn)
 	}()
 	go func() {
-		slog.Info("HTTP server listening", "addr", cfg.HTTPAddr, "ui_auth", cfg.AuthEnabled)
+		slog.Info("HTTP server listening", "addr", cfg.HTTPAddr, "auth_mode", cfg.AuthMode())
+		switch {
+		case cfg.AuthEnabled && cfg.AccessToken != "":
+			slog.Warn("ACCESS_TOKEN is ignored because AUTH_ENABLED=true (user accounts are in use)")
+		case cfg.AuthMode() == config.AuthModeNone:
+			slog.Warn("UI and API are open to anyone who can reach them (AUTH_ENABLED=false, no ACCESS_TOKEN)")
+		}
 		errc <- httpServer.Serve(httpLn)
 	}()
 
@@ -193,13 +199,14 @@ func limitedListener(addr string, max int) (net.Listener, error) {
 	return ln, nil
 }
 
-// bootstrap creates the first admin user and the default inbox on an empty database.
+// bootstrap creates the first admin user (only when user accounts are enabled) and the default inbox on an empty
+// database. Without accounts there is nobody to sign in, so no admin is created until AUTH_ENABLED is turned on.
 func bootstrap(ctx context.Context, cfg *config.Config, st *store.Store) error {
 	n, err := st.CountUsers(ctx)
 	if err != nil {
 		return err
 	}
-	if n == 0 {
+	if n == 0 && cfg.AuthEnabled {
 		pw := cfg.AdminPassword
 		generated := pw == ""
 		if generated {

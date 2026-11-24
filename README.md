@@ -73,7 +73,20 @@ and shown in a web UI with a data grid, filters and previews. Nothing is ever re
 - 🌗 **Dark mode** that follows the operating system by default, with a manual light/dark override; keyboard shortcuts (`j`/`k`, `Del`, `Esc`); responsive layout.
 - 📦 A single Go binary with the UI embedded, plus Postgres, all with `docker compose up`.
 
-## Quick start (5 minutes)
+## Quick start
+
+### One command, no setup
+
+```bash
+docker run --rm -p 8025:8025 -p 1025:1025 matiasrohleder/postdream:standalone
+```
+
+Open **http://localhost:8025** (no login) and point your app's SMTP at **localhost:1025**. The `standalone` image
+brings its own PostgreSQL; add `-v postdream:/data` to keep the emails and `-e ACCESS_TOKEN=a-long-key` to protect the
+UI and API with a single key. Ideal for your laptop, tests and CI.
+See [Run it in one command](https://docs-postdream.up.railway.app/docs/getting-started/one-command).
+
+### For a team (user accounts, external PostgreSQL)
 
 Requirements: **Docker** with Docker Compose. You don't need to clone anything, nor install Go or Node.
 
@@ -358,6 +371,7 @@ A ready-made Grafana dashboard is in [`docs/grafana-dashboard.json`](docs/grafan
 | `SMTP_MAX_RECIPIENTS`          | `100`                      | Maximum recipients per email                               |
 | `DEFAULT_INBOX`                | `default`                  | Slug of the inbox that receives anonymous mail             |
 | `DEFAULT_INBOX_SMTP_PASSWORD`  | random                     | SMTP password of the default inbox when it's created       |
+| `ACCESS_TOKEN`                 | —                          | With `AUTH_ENABLED=false`: one shared key for UI and API instead of user accounts |
 | `AUTH_ENABLED`                 | `true`                     | Require login in the UI                                    |
 | `ADMIN_EMAIL`                  | `admin@postdream.local`  | Initial admin (only with an empty database)                |
 | `ADMIN_PASSWORD`               | random (logged)            | Initial admin password                                     |
@@ -419,13 +433,10 @@ On the server you can use that image instead of `build:`.
 **Kubernetes**: `helm install postdream deploy/helm/postdream --set database.url=postgres://…` (see the chart's
 `values.yaml`; Postgres is external, several replicas are supported).
 
-**Testcontainers**: run the published image next to a Postgres container, e.g. with `testcontainers-node`:
+**Testcontainers**: the standalone image needs no database container, e.g. with `testcontainers-node`:
 
 ```js
-const pg = await new PostgreSqlContainer('postgres:17-alpine').withNetwork(net).withNetworkAliases('db').start()
-const pd = await new GenericContainer('ghcr.io/matiasrohleder/postdream:0.1.0').withNetwork(net)
-  .withEnvironment({ DATABASE_URL: `postgres://${pg.getUsername()}:${pg.getPassword()}@db:5432/${pg.getDatabase()}?sslmode=disable`,
-                     AUTH_ENABLED: 'false' })
+const pd = await new GenericContainer('ghcr.io/matiasrohleder/postdream:standalone')
   .withExposedPorts(1025, 8025).withWaitStrategy(Wait.forHttp('/api/health', 8025)).start()
 ```
 
@@ -504,5 +515,5 @@ automatically on startup.
 
 ## Versioning
 
-The project follows [Semantic Versioning](https://semver.org). Current version: **0.1.0**.
+The project follows [Semantic Versioning](https://semver.org). Current version: **0.2.0**.
 The version is injected at build time (`VERSION` build arg) and shown in the UI sidebar and `/api/health`.

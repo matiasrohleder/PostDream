@@ -219,7 +219,9 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) authenticate(next http.HandlerFunc, userOnly bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := &principal{}
-		if tok := bearer(r); tok != "" {
+		if tok := bearer(r); tok != "" && s.isAccessToken(tok) {
+			p.User = accessTokenUser
+		} else if tok != "" {
 			if userOnly {
 				writeErr(w, 403, "API tokens cannot use this endpoint")
 				return
@@ -230,6 +232,13 @@ func (s *Server) authenticate(next http.HandlerFunc, userOnly bool) http.Handler
 				return
 			}
 			p.Inbox = inbox
+		} else if s.cfg.AuthMode() == config.AuthModeToken {
+			c, err := r.Cookie(sessionCookie)
+			if err != nil || !s.isAccessCookie(c.Value) {
+				writeErr(w, 401, "access token required")
+				return
+			}
+			p.User = accessTokenUser
 		} else if !s.cfg.AuthEnabled {
 			p.User = &store.User{ID: "", Email: "anonymous", Name: "Anonymous", Role: "admin"}
 		} else {
@@ -386,6 +395,7 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"version":          Version,
 		"auth_enabled":     s.cfg.AuthEnabled,
+		"auth_mode":        s.cfg.AuthMode(),
 		"smtp_auth":        s.cfg.SMTPAuth,
 		"smtp_port":        portOf(s.cfg.SMTPAddr),
 		"smtp_tls":         s.cfg.SMTPTLSCert != "",

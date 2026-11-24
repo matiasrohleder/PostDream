@@ -65,10 +65,10 @@ export default function Layout() {
         <NavLink to="/settings" className="icon-btn" title={t('Settings')}>
           <Icon name="settings" />
         </NavLink>
-        {config.auth_enabled && (
+        {config.auth_mode !== 'none' && (
           <div className="user-chip">
             <span className="avatar">{(user.name || user.email || '?')[0].toUpperCase()}</span>
-            <span className="user-email">{user.email}</span>
+            <span className="user-email">{config.auth_mode === 'token' ? t('Access token') : user.email}</span>
             <button className="icon-btn" onClick={logout} title={t('Sign out')}>
               <Icon name="logout" />
             </button>

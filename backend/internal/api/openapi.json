@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "PostDream API",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SMTP sandbox API. Authenticate with the UI session cookie or with an inbox API token (`Authorization: Bearer <api_token>`), which is scoped to that inbox.",
   "license": {
    "name": "MIT"
@@ -55,7 +55,7 @@
    "bearerAuth": {
     "type": "http",
     "scheme": "bearer",
-    "description": "Inbox API token"
+    "description": "Inbox API token, or ACCESS_TOKEN in access-token mode (full access)"
    }
   },
   "schemas": {
@@ -1076,6 +1076,7 @@
      "Auth"
     ],
     "summary": "Log in (sets the session cookie)",
+    "description": "With user accounts (AUTH_ENABLED=true) send email and password. In access-token mode (AUTH_ENABLED=false with ACCESS_TOKEN set) send only token.",
     "security": [],
     "responses": {
      "200": {
@@ -1111,12 +1112,12 @@
          },
          "password": {
           "type": "string"
+         },
+         "token": {
+          "type": "string",
+          "description": "ACCESS_TOKEN, in access-token mode"
          }
-        },
-        "required": [
-         "email",
-         "password"
-        ]
+        }
        }
       }
      }

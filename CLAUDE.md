@@ -2,7 +2,7 @@
 
 SMTP sandbox: a Go service captures every email sent to it (SMTP :1025, optional POP3 :1110), stores it in PostgreSQL
 and serves a React UI + JSON API (HTTP :8025). Nothing is relayed unless an admin explicitly enables releasing
-(`RELAY_SMTP_URL` + a per-inbox recipient regex). Current version: **0.1.0** (SemVer).
+(`RELAY_SMTP_URL` + a per-inbox recipient regex). Current version: **0.2.0** (SemVer).
 
 ## Layout
 
@@ -34,7 +34,8 @@ and serves a React UI + JSON API (HTTP :8025). Nothing is relayed unless an admi
 - `scripts/send-test-mail.py` – stdlib-only test sender (HTML + inline cid image + optional attachments);
   `scripts/update-caniemail.py` – refreshes the vendored caniemail data
 - `docker-compose.yml` (full stack; `--profile spam` adds Rspamd), `docker-compose.dev.yml` (Postgres only on
-  127.0.0.1:5433), multi-stage `Dockerfile`, `deploy/helm/postdream` (Helm chart), `docs/grafana-dashboard.json`
+  127.0.0.1:5433), multi-stage `Dockerfile` (default target = PostDream only; `--target standalone` = PostDream +
+  embedded PostgreSQL via `deploy/standalone/entrypoint.sh`, no accounts), `deploy/helm/postdream` (Helm chart), `docs/grafana-dashboard.json`
 - `website/` – Docusaurus documentation site (English, Markdown in `website/docs/`, sidebar in `sidebars.js`),
   served by Caddy (`website/Dockerfile`); `website/scripts/seed-demo.py` + `screenshots.py` regenerate the screenshots
 
@@ -68,6 +69,8 @@ Local `.env` (git-ignored) holds `ADMIN_PASSWORD`; default dev admin is `admin@p
 - **Multitenancy/authorization**: an inbox is the tenant. Always scope message queries through
   `principal.allowedInboxes()` / `canAccess()` in `internal/api`; API-token principals are limited to one inbox and
   must never see `smtp_password`/`api_token`. Admin-only routes use the `admin(...)` helper in `api.go`.
+  Auth modes (`config.AuthMode()`): `users` (accounts), `token` (AUTH_ENABLED=false + ACCESS_TOKEN, one shared key for
+  UI cookie and API bearer), `none` (open).
 - **Security**: email HTML is only rendered in the UI via `iframe srcdoc` with `sandbox` (no `allow-scripts`);
   attachments are always served with `Content-Disposition: attachment` + CSP `sandbox`. Keep it that way.
 - **New API routes**: add them to `Routes()` and to `internal/api/openapi.json` (OpenAPI 3.1);
@@ -95,4 +98,5 @@ Local `.env` (git-ignored) holds `ADMIN_PASSWORD`; default dev admin is `admin@p
 Bump the version in `docker-compose.yml` (`VERSION` default), `Dockerfile` (`ARG VERSION`), `frontend/package.json`,
 `backend/cmd/postdream/main.go` (`version` fallback), README "Versioning" and this file; tag `vX.Y.Z`.
 CI (`.github/workflows/ci.yml`) tests and pushes `ghcr.io/matiasrohleder/postdream` and, when the `DOCKERHUB_USERNAME`/
-`DOCKERHUB_TOKEN` secrets exist, Docker Hub; a `v*` tag also moves `latest` and creates the GitHub release.
+`DOCKERHUB_TOKEN` secrets exist, Docker Hub; a `v*` tag also moves `latest` and creates the GitHub release. The standalone target is published
+with `-standalone` suffixed tags plus `standalone` (newest release); CI smoke-tests it before publishing.
