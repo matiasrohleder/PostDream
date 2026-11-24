@@ -118,7 +118,7 @@ jobs:
           build-args: VERSION=${{ startsWith(github.ref, 'refs/tags/v') && steps.meta.outputs.version || format('0.1.0-dev+{0}', github.sha) }}
       - name: Docker Hub description
         if: startsWith(github.ref, 'refs/tags/v') && env.DOCKERHUB_USERNAME != ''
-        uses: peter-evans/dockerhub-description@v4
+        uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
