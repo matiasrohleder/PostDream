@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpat
 # ---------- 3a. Standalone: PostDream + its own PostgreSQL in one container ----------
 # docker build --target standalone .   ->   docker run -p 8025:8025 -p 1025:1025 <image>
 # No login and no external database: made for local use, tests and CI. Data lives in /data (mount a volume to keep it).
-FROM postgres:17-alpine AS standalone
+FROM postgres:18-alpine AS standalone
 RUN apk add --no-cache ca-certificates tzdata \
  && mkdir -p /data /run/postgresql && chown -R postgres:postgres /data /run/postgresql
 COPY --from=api /out/postdream /usr/local/bin/postdream
