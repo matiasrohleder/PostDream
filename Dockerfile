@@ -21,7 +21,7 @@ ARG VERSION=0.1.0
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/postdream ./cmd/postdream
 
 # ---------- 3. Runtime ----------
-FROM alpine:3.21
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata && adduser -D -H -u 10001 postdream
 COPY --from=api /out/postdream /usr/local/bin/postdream
 USER postdream
