@@ -99,3 +99,78 @@ func TestPrincipalScopes(t *testing.T) {
 		t.Error("token scope wrong")
 	}
 }
+
+func TestAccessTokenMode(t *testing.T) {
+	cfg := &config.Config{AuthEnabled: false, AccessToken: "s3cret-token"}
+	if cfg.AuthMode() != config.AuthModeToken {
+		t.Fatalf("auth mode = %q", cfg.AuthMode())
+	}
+	s := New(Deps{Config: cfg})
+	var got *principal
+	h := s.authenticate(func(w http.ResponseWriter, r *http.Request) { got = from(r); w.WriteHeader(204) }, false)
+	call := func(req *http.Request) int {
+		got = nil
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	if code := call(httptest.NewRequest("GET", "/api/messages", nil)); code != 401 {
+		t.Errorf("no credentials: got %d want 401", code)
+	}
+
+	req := httptest.NewRequest("GET", "/api/messages", nil)
+	req.Header.Set("Authorization", "Bearer s3cret-token")
+	if code := call(req); code != 204 || got == nil || got.User == nil || got.User.Role != "admin" {
+		t.Errorf("bearer access token: got %d principal %+v", code, got)
+	}
+
+	req = httptest.NewRequest("GET", "/api/messages", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: "forged"})
+	if code := call(req); code != 401 {
+		t.Errorf("forged cookie: got %d want 401", code)
+	}
+
+	// Login with the token sets a cookie that then authenticates.
+	rec := httptest.NewRecorder()
+	s.login(rec, httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(`{"token":"s3cret-token"}`)))
+	if rec.Code != 200 {
+		t.Fatalf("login: got %d %s", rec.Code, rec.Body)
+	}
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Value == "s3cret-token" {
+		t.Fatalf("login cookie: %+v", cookies)
+	}
+	req = httptest.NewRequest("GET", "/api/messages", nil)
+	req.AddCookie(cookies[0])
+	if code := call(req); code != 204 {
+		t.Errorf("cookie after login: got %d want 204", code)
+	}
+
+	rec = httptest.NewRecorder()
+	s.login(rec, httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(`{"token":"wrong"}`)))
+	if rec.Code != 401 {
+		t.Errorf("wrong token login: got %d want 401", rec.Code)
+	}
+}
+
+func TestAuthModes(t *testing.T) {
+	for _, c := range []struct {
+		cfg  config.Config
+		want string
+	}{
+		{config.Config{AuthEnabled: true}, config.AuthModeUsers},
+		{config.Config{AuthEnabled: true, AccessToken: "ignored-token"}, config.AuthModeUsers},
+		{config.Config{AuthEnabled: false}, config.AuthModeNone},
+		{config.Config{AuthEnabled: false, AccessToken: "abcdefgh"}, config.AuthModeToken},
+	} {
+		if got := c.cfg.AuthMode(); got != c.want {
+			t.Errorf("%+v: got %s want %s", c.cfg, got, c.want)
+		}
+	}
+	// In users mode a Bearer equal to ACCESS_TOKEN is not special.
+	s := New(Deps{Config: &config.Config{AuthEnabled: true, AccessToken: "ignored-token"}})
+	if s.isAccessToken("ignored-token") {
+		t.Error("access token must be ignored when user accounts are enabled")
+	}
+}

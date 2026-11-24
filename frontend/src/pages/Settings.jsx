@@ -464,7 +464,7 @@ function ServerPage() {
           <tr><th>{t('Version')}</th><td>{config.version}</td></tr>
           <tr><th>{t('SMTP port')}</th><td>{config.smtp_port}</td></tr>
           <tr><th>{t('SMTP authentication')}</th><td>{authLabel[config.smtp_auth] || config.smtp_auth}</td></tr>
-          <tr><th>{t('UI login')}</th><td>{config.auth_enabled ? t('Required') : t('Disabled (AUTH_ENABLED=false)')}</td></tr>
+          <tr><th>{t('UI login')}</th><td>{config.auth_mode === 'users' ? t('Required') : config.auth_mode === 'token' ? t('Access token (ACCESS_TOKEN)') : t('Disabled (AUTH_ENABLED=false)')}</td></tr>
           <tr><th>{t('Default retention')}</th><td>{t('{h} hours', { h: config.retention_hours })}</td></tr>
           <tr><th>{t('Max email size')}</th><td>{config.max_message_mb} MB</td></tr>
           <tr><th>{t('Default inbox')}</th><td><code>{config.default_inbox}</code></td></tr>

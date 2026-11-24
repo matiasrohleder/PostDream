@@ -31,7 +31,13 @@ On first start (empty database) PostDream creates an admin from `ADMIN_EMAIL` an
 is empty, a random one is printed in the logs. These variables are ignored afterwards; change the password in
 **Settings → My account**.
 
-## Running without login
+## Running without user accounts
 
-`AUTH_ENABLED=false` disables the UI login entirely: everyone who can reach the UI is an admin. Only do this for a
-100 % local setup or a throwaway container in tests (see [Testcontainers](../operations/deployment.md#testcontainers)).
+`AUTH_ENABLED=false` turns user accounts off. Two variants:
+
+| | Who gets in |
+|---|---|
+| No `ACCESS_TOKEN` | Everyone who can reach the UI or the API, as an admin. For your own machine or a throwaway container |
+| `ACCESS_TOKEN=a-long-key` | Whoever knows the key: the UI asks only for it, and the API accepts it as `Authorization: Bearer a-long-key` |
+
+Inbox API tokens keep working in both. This is how the [standalone image](../getting-started/one-command.md) runs.

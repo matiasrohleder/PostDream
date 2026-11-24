@@ -66,6 +66,29 @@ type Config struct {
 
 	MetricsAddr  string // separate unauthenticated listener, e.g. :9090
 	MetricsToken string // enables /metrics on the HTTP port behind "Authorization: Bearer <token>"
+
+	// AccessToken protects an instance that runs without user accounts (AUTH_ENABLED=false): the UI asks for this
+	// single key and the API accepts it as a Bearer token with full access. Ignored when AUTH_ENABLED=true.
+	AccessToken string
+}
+
+// Auth modes reported to the UI.
+const (
+	AuthModeUsers = "users" // login with user accounts
+	AuthModeToken = "token" // no accounts, one shared ACCESS_TOKEN
+	AuthModeNone  = "none"  // open: no login at all
+)
+
+// AuthMode tells how the UI and API authenticate people (inbox API tokens work in every mode).
+func (c *Config) AuthMode() string {
+	switch {
+	case c.AuthEnabled:
+		return AuthModeUsers
+	case c.AccessToken != "":
+		return AuthModeToken
+	default:
+		return AuthModeNone
+	}
 }
 
 func Load() (*Config, error) {
@@ -107,6 +130,7 @@ func Load() (*Config, error) {
 		POP3Addr:              env("POP3_ADDR", ""),
 		MetricsAddr:           env("METRICS_ADDR", ""),
 		MetricsToken:          env("METRICS_TOKEN", ""),
+		AccessToken:           env("ACCESS_TOKEN", ""),
 	}
 	switch c.SMTPAuth {
 	case SMTPAuthOff, SMTPAuthOptional, SMTPAuthRequired:
@@ -123,6 +147,9 @@ func Load() (*Config, error) {
 	}
 	if c.SMTPRequireTLS && c.SMTPTLSCert == "" {
 		return nil, fmt.Errorf("SMTP_REQUIRE_TLS needs SMTP_TLS_CERT and SMTP_TLS_KEY")
+	}
+	if c.AccessToken != "" && len(c.AccessToken) < 8 {
+		return nil, fmt.Errorf("ACCESS_TOKEN must have at least 8 characters")
 	}
 	if c.JobWorkers < 1 {
 		c.JobWorkers = 1

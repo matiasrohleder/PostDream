@@ -10,6 +10,7 @@ Migrations run automatically on startup.
 
 | Option | Good for |
 |---|---|
+| [Standalone image](../getting-started/one-command.md) | One container, no setup: your laptop, tests, CI |
 | [Docker Compose on a VPS](#vps-with-docker-compose) | A team server with a domain |
 | [Railway](railway.md) | Managed hosting with auto-deploy from GitHub |
 | [Kubernetes (Helm)](#kubernetes-helm) | Clusters, several replicas |
@@ -75,7 +76,7 @@ docker pull docker.io/matiasrohleder/postdream:latest
 | Tag | Points to |
 |---|---|
 | `latest` | The newest release |
-| `0.1.0`, `0.1` | A release / the newest patch of a minor version |
+| `0.2.0`, `0.2` | A release / the newest patch of a minor version |
 | `main` | The tip of the `main` branch (unreleased) |
 | `sha-<commit>` | One exact commit |
 
@@ -95,18 +96,17 @@ service ports, ingress and resources. PostgreSQL is external. Several replicas a
 
 ## Testcontainers
 
-Start a disposable PostDream next to a Postgres container in your test setup, for example with `testcontainers-node`:
+The [standalone image](../getting-started/one-command.md) needs no database container, so a disposable PostDream is a
+single container in your test setup. With `testcontainers-node`:
 
 ```js
-const pg = await new PostgreSqlContainer('postgres:17-alpine').withNetwork(net).withNetworkAliases('db').start()
-const pd = await new GenericContainer('ghcr.io/matiasrohleder/postdream:0.1.0').withNetwork(net)
-  .withEnvironment({
-    DATABASE_URL: `postgres://${pg.getUsername()}:${pg.getPassword()}@db:5432/${pg.getDatabase()}?sslmode=disable`,
-    AUTH_ENABLED: 'false',
-  })
+const pd = await new GenericContainer('ghcr.io/matiasrohleder/postdream:standalone')
   .withExposedPorts(1025, 8025)
   .withWaitStrategy(Wait.forHttp('/api/health', 8025))
   .start()
+
+const smtpPort = pd.getMappedPort(1025)
+const api = `http://${pd.getHost()}:${pd.getMappedPort(8025)}/api`
 ```
 
 ## Backups

@@ -60,8 +60,47 @@ jobs:
           curl -fs http://localhost:8080/docs/getting-started/quick-start | grep -q 'Quick start'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/does-not-exist)" = 404
 
+  standalone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the standalone image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: standalone
+          load: true
+          tags: postdream:standalone-test
+      - name: One container, no setup, catches an email
+        run: |
+          set -x
+          docker run -d --name pd -p 8025:8025 -p 1025:1025 postdream:standalone-test
+          for i in $(seq 1 60); do curl -fs http://localhost:8025/api/health && break; sleep 1; done
+          curl -fs http://localhost:8025/api/config | grep -q '"auth_mode":"none"'
+          python3 - <<'PY'
+          import smtplib
+          from email.message import EmailMessage
+          m = EmailMessage(); m["From"] = "ci@example.com"; m["To"] = "user@example.com"; m["Subject"] = "standalone smoke"
+          m.set_content("hello")
+          with smtplib.SMTP("localhost", 1025) as s:
+              s.send_message(m)
+          PY
+          sleep 1
+          curl -fs http://localhost:8025/api/messages | grep -q "standalone smoke"
+          docker stop -t 20 pd
+          docker logs pd 2>&1 | tail -5
+          test "$(docker inspect -f '{{.State.ExitCode}}' pd)" = 0
+      - name: Access token protects UI and API
+        run: |
+          set -x
+          docker run -d --name pdt -e ACCESS_TOKEN=ci-secret-token -p 18025:8025 postdream:standalone-test
+          for i in $(seq 1 60); do curl -fs http://localhost:18025/api/health && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18025/api/messages)" = 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer ci-secret-token' http://localhost:18025/api/messages)" = 200
+
   image:
-    needs: [test, docs]
+    needs: [test, docs, standalone]
     runs-on: ubuntu-latest
     permissions:
       contents: write   # GitHub release on tags
@@ -115,7 +154,32 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: VERSION=${{ startsWith(github.ref, 'refs/tags/v') && steps.meta.outputs.version || format('0.1.0-dev+{0}', github.sha) }}
+          build-args: VERSION=${{ startsWith(github.ref, 'refs/tags/v') && steps.meta.outputs.version || format('0.2.0-dev+{0}', github.sha) }}
+      - id: meta_standalone
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.names.outputs.images }}
+          # "standalone" follows the newest release, like "latest" does for the regular image.
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},suffix=-standalone
+            type=semver,pattern={{major}}.{{minor}},suffix=-standalone
+            type=raw,value=standalone,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=branch,suffix=-standalone
+          labels: |
+            org.opencontainers.image.title=PostDream standalone
+            org.opencontainers.image.description=PostDream with its own PostgreSQL inside: one container, no setup
+            org.opencontainers.image.licenses=MIT
+      - name: Build and push the standalone image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: standalone
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta_standalone.outputs.tags }}
+          labels: ${{ steps.meta_standalone.outputs.labels }}
+          build-args: VERSION=${{ startsWith(github.ref, 'refs/tags/v') && steps.meta.outputs.version || format('0.2.0-dev+{0}', github.sha) }}
       - name: Docker Hub description
         if: startsWith(github.ref, 'refs/tags/v') && env.DOCKERHUB_USERNAME != ''
         uses: peter-evans/dockerhub-description@v4

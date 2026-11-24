@@ -4,6 +4,7 @@ const sidebars = {
   docs: [
     'intro',
     {type: 'category', label: 'Getting started', collapsed: false, items: [
+      'getting-started/one-command',
       'getting-started/quick-start',
       'getting-started/sending-test-emails',
       'getting-started/connect-your-app',

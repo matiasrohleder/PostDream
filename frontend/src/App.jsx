@@ -57,7 +57,7 @@ export default function App() {
   return (
     <AppContext.Provider value={ctx}>
       <Routes>
-        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login onLogin={setUser} />} />
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login onLogin={setUser} config={config} />} />
         <Route element={user ? <Layout /> : <Navigate to="/login" replace />}>
           <Route path="/" element={<Mailbox />} />
           <Route path="/inbox/:inboxId" element={<Mailbox />} />

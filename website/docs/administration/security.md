@@ -24,7 +24,8 @@ Related settings:
 
 ## UI and API
 
-- **Login required** by default (`AUTH_ENABLED=true`).
+- **Login required** by default (`AUTH_ENABLED=true`). Without accounts (`AUTH_ENABLED=false`), set `ACCESS_TOKEN` so
+  one shared key protects the UI and the API ([Users and roles](users-and-roles.md#running-without-user-accounts)).
 - Sessions are stored in Postgres; cookies are `HttpOnly` and `SameSite=Strict`, and `Secure` with `COOKIE_SECURE=true`
   (set it whenever the UI is served over HTTPS).
 - Passwords are hashed with **bcrypt**; session tokens are stored as SHA-256 hashes.

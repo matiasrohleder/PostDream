@@ -3,8 +3,9 @@ import { api } from '../lib/api.js'
 import { LanguageSelect, useT } from '../i18n/index.jsx'
 import Logo from '../components/Logo.jsx'
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, config }) {
   const t = useT()
+  const tokenMode = config?.auth_mode === 'token'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -15,9 +16,11 @@ export default function Login({ onLogin }) {
     setError('')
     setLoading(true)
     try {
-      onLogin(await api('/auth/login', { method: 'POST', body: { email, password } }))
+      const body = tokenMode ? { token: password } : { email, password }
+      onLogin(await api('/auth/login', { method: 'POST', body }))
     } catch (err) {
-      setError(err.status === 401 ? t('Invalid email or password') : err.status === 429 ? t('Too many failed attempts, try again later') : err.message)
+      const invalid = tokenMode ? t('Invalid access token') : t('Invalid email or password')
+      setError(err.status === 401 ? invalid : err.status === 429 ? t('Too many failed attempts, try again later') : err.message)
     } finally {
       setLoading(false)
     }
@@ -32,13 +35,22 @@ export default function Login({ onLogin }) {
           Post<b>Dream</b>
         </h1>
         <p className="muted">{t('Catch every email your test environments send.')}</p>
+        {!tokenMode && (
+          <label>
+            {t('Email')}
+            <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+          </label>
+        )}
         <label>
-          {t('Email')}
-          <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-        </label>
-        <label>
-          {t('Password')}
-          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          {tokenMode ? t('Access token') : t('Password')}
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoFocus={tokenMode}
+          />
         </label>
         {error && <div className="form-error">{error}</div>}
         <button className="btn btn-primary btn-block" disabled={loading}>

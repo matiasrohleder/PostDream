@@ -27,7 +27,7 @@ services:
     build:
       context: .
       args:
-        VERSION: ${VERSION:-0.1.0}
+        VERSION: ${VERSION:-0.2.0}
     image: postdream:latest
     restart: unless-stopped
     depends_on:
@@ -42,6 +42,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@postdream.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      ACCESS_TOKEN: ${ACCESS_TOKEN:-}
       SMTP_AUTH: ${SMTP_AUTH:-optional}
       SMTP_HOSTNAME: ${SMTP_HOSTNAME:-postdream}
       SMTP_MAX_MESSAGE_BYTES: ${SMTP_MAX_MESSAGE_BYTES:-26214400}
