@@ -1,0 +1,14 @@
+.env
+node_modules/
+frontend/dist/
+backend/web/dist/*
+!backend/web/dist/index.html
+/bin/
+*.log
+.DS_Store
+docs/*-preview.png
+
+# Editor / local tooling
+.vscode/
+.claude/settings.local.json
+__pycache__/

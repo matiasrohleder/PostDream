@@ -1,0 +1,69 @@
+# Several replicas are supported: live updates use Postgres LISTEN/NOTIFY and jobs use SKIP LOCKED.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/matiasrohleder/postdream
+  tag: ""            # defaults to the chart appVersion
+  pullPolicy: IfNotPresent
+
+# PostgreSQL connection. Either set `url` or point `existingSecret` to a secret with a DATABASE_URL key.
+database:
+  url: ""
+  existingSecret: ""
+
+admin:
+  email: admin@postdream.local
+  password: ""       # empty = generated on first start and printed in the logs
+  existingSecret: "" # secret with an ADMIN_PASSWORD key
+
+# Any other environment variable from the README ("Environment variables").
+env:
+  SMTP_AUTH: required
+  RETENTION_HOURS: "72"
+  POP3_ADDR: ":1110"
+  COOKIE_SECURE: "true"
+  TRUST_PROXY: "true"
+  # PUBLIC_URL: https://mail.example.com
+  # ALLOWED_HOSTS: mail.example.com
+  # RSPAMD_URL: http://rspamd:11333
+
+# Secret environment variables (stored in a Secret), e.g. METRICS_TOKEN, RELAY_SMTP_URL, RSPAMD_PASSWORD.
+secretEnv: {}
+
+service:
+  type: ClusterIP
+  httpPort: 8025
+  # SMTP/POP3 usually need a LoadBalancer or NodePort to be reachable from outside the cluster.
+  smtp:
+    type: ClusterIP
+    port: 1025
+    pop3Port: 1110
+    annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # nginx: SSE needs buffering disabled
+    # nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  hosts:
+    - host: mail.example.com
+      paths: ["/"]
+  tls: []
+
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits: { memory: 512Mi }
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}

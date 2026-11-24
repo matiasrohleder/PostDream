@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: backend/go.sum
+      - name: gofmt
+        working-directory: backend
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - name: Go tests
+        working-directory: backend
+        run: go vet ./... && go test -race ./...
+      - name: Fuzz (short)
+        working-directory: backend
+        run: |
+          go test -run='^$' -fuzz=FuzzParseSearch -fuzztime=20s ./internal/store
+          go test -run='^$' -fuzz='^FuzzParse$' -fuzztime=20s ./internal/mailparse
+      - name: govulncheck
+        working-directory: backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build UI
+        working-directory: frontend
+        run: npm ci && npm run build
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: Build documentation (fails on broken links)
+        working-directory: website
+        run: npm ci && npm run build
+      - name: Docs container serves the site
+        run: |
+          set -x
+          docker build -t postdream-docs website
+          docker run -d --name docs -e PORT=8080 -p 8080:8080 postdream-docs
+          for i in $(seq 1 20); do curl -fs http://localhost:8080/healthz && break; sleep 1; done
+          curl -fs http://localhost:8080/ | grep -q PostDream
+          curl -fs http://localhost:8080/docs/getting-started/quick-start | grep -q 'Quick start'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/does-not-exist)" = 404
+
+  image:
+    needs: [test, docs]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # GitHub release on tags
+      packages: write
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request' && env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Image names
+        id: names
+        run: |
+          # GHCR names must be lowercase. Docker Hub is added only when its secrets are configured.
+          images="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/postdream"
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ "${{ github.event_name }}" != pull_request ]; then
+            images="$images"$'\n'"docker.io/$DOCKERHUB_USERNAME/postdream"
+          fi
+          { echo 'images<<EOF'; echo "$images"; echo EOF; } >> "$GITHUB_OUTPUT"
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.names.outputs.images }}
+          # "latest" follows the newest v* tag; main gets its own moving tag.
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha
+          labels: |
+            org.opencontainers.image.title=PostDream
+            org.opencontainers.image.description=SMTP sandbox: catches every email your apps send, with a web UI and API
+            org.opencontainers.image.licenses=MIT
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ startsWith(github.ref, 'refs/tags/v') && steps.meta.outputs.version || format('0.1.0-dev+{0}', github.sha) }}
+      - name: Docker Hub description
+        if: startsWith(github.ref, 'refs/tags/v') && env.DOCKERHUB_USERNAME != ''
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/postdream
+          short-description: SMTP sandbox that catches every email your apps send. Web UI, API, webhooks, analysis.
+          readme-filepath: ./README.md
+      - name: GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" --verify-tag --generate-notes \
+            --title "PostDream ${{ github.ref_name }}" \
+            --notes "Docker: \`docker pull ghcr.io/${{ github.repository_owner }}/postdream:${{ steps.meta.outputs.version }}\`" || true

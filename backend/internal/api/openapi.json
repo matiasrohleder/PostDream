@@ -1,0 +1,3838 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "PostDream API",
+  "version": "0.1.0",
+  "description": "SMTP sandbox API. Authenticate with the UI session cookie or with an inbox API token (`Authorization: Bearer <api_token>`), which is scoped to that inbox.",
+  "license": {
+   "name": "MIT"
+  }
+ },
+ "servers": [
+  {
+   "url": "/"
+  }
+ ],
+ "tags": [
+  {
+   "name": "Messages"
+  },
+  {
+   "name": "Analysis"
+  },
+  {
+   "name": "Tags"
+  },
+  {
+   "name": "Inboxes"
+  },
+  {
+   "name": "Webhooks"
+  },
+  {
+   "name": "Chaos"
+  },
+  {
+   "name": "Relay"
+  },
+  {
+   "name": "Users"
+  },
+  {
+   "name": "Auth"
+  },
+  {
+   "name": "System"
+  }
+ ],
+ "components": {
+  "securitySchemes": {
+   "cookieAuth": {
+    "type": "apiKey",
+    "in": "cookie",
+    "name": "pd_session"
+   },
+   "bearerAuth": {
+    "type": "http",
+    "scheme": "bearer",
+    "description": "Inbox API token"
+   }
+  },
+  "schemas": {
+   "Error": {
+    "type": "object",
+    "properties": {
+     "error": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "error"
+    ]
+   },
+   "Ok": {
+    "type": "object",
+    "properties": {
+     "ok": {
+      "type": "boolean"
+     }
+    }
+   },
+   "MessageSummary": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "inbox_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "inbox_name": {
+      "type": "string"
+     },
+     "from": {
+      "type": "string"
+     },
+     "to": {
+      "type": "string"
+     },
+     "subject": {
+      "type": "string"
+     },
+     "snippet": {
+      "type": "string"
+     },
+     "size": {
+      "type": "integer"
+     },
+     "attachment_count": {
+      "type": "integer"
+     },
+     "is_read": {
+      "type": "boolean"
+     },
+     "received_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "tags": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "spam_score": {
+      "type": [
+       "number",
+       "null"
+      ]
+     }
+    }
+   },
+   "Attachment": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "filename": {
+      "type": "string"
+     },
+     "content_type": {
+      "type": "string"
+     },
+     "content_id": {
+      "type": "string"
+     },
+     "inline": {
+      "type": "boolean"
+     },
+     "size": {
+      "type": "integer"
+     }
+    }
+   },
+   "Message": {
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/MessageSummary"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "message_id": {
+        "type": "string"
+       },
+       "envelope_from": {
+        "type": "string"
+       },
+       "envelope_to": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "cc": {
+        "type": "string"
+       },
+       "text_body": {
+        "type": "string"
+       },
+       "has_html": {
+        "type": "boolean"
+       },
+       "headers": {
+        "type": "object",
+        "additionalProperties": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       },
+       "client_ip": {
+        "type": "string"
+       },
+       "smtp_user": {
+        "type": "string"
+       },
+       "attachments": {
+        "type": "array",
+        "items": {
+         "$ref": "#/components/schemas/Attachment"
+        }
+       },
+       "spam_report": {
+        "oneOf": [
+         {
+          "$ref": "#/components/schemas/SpamReport"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       }
+      }
+     }
+    ]
+   },
+   "MessagePage": {
+    "type": "object",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/MessageSummary"
+      }
+     },
+     "total": {
+      "type": "integer"
+     },
+     "page": {
+      "type": "integer"
+     },
+     "page_size": {
+      "type": "integer"
+     }
+    }
+   },
+   "ChaosRule": {
+    "type": "object",
+    "properties": {
+     "code": {
+      "type": "integer",
+      "minimum": 400,
+      "maximum": 599
+     },
+     "probability": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+     },
+     "message": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "probability"
+    ]
+   },
+   "Chaos": {
+    "type": "object",
+    "properties": {
+     "auth": {
+      "$ref": "#/components/schemas/ChaosRule"
+     },
+     "mail": {
+      "$ref": "#/components/schemas/ChaosRule"
+     },
+     "rcpt": {
+      "$ref": "#/components/schemas/ChaosRule"
+     },
+     "data": {
+      "$ref": "#/components/schemas/ChaosRule"
+     }
+    },
+    "description": "SMTP fault injection per stage. Omit a stage to disable it."
+   },
+   "Settings": {
+    "type": "object",
+    "properties": {
+     "spam_check": {
+      "type": "boolean"
+     },
+     "allowed_hosts": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "link_domains": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "allowed_recipients": {
+      "type": "string",
+      "description": "Regex every RCPT TO must match ('' = all)"
+     },
+     "relay_recipients": {
+      "type": "string",
+      "description": "Regex release recipients must match ('' = releasing disabled)"
+     }
+    }
+   },
+   "Inbox": {
+    "allOf": [
+     {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slug": {
+        "type": "string"
+       },
+       "description": {
+        "type": "string"
+       },
+       "smtp_username": {
+        "type": "string"
+       },
+       "smtp_password": {
+        "type": "string",
+        "description": "Omitted for API-token callers"
+       },
+       "api_token": {
+        "type": "string",
+        "description": "Omitted for API-token callers"
+       },
+       "retention_hours": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "created_at": {
+        "type": "string",
+        "format": "date-time"
+       },
+       "message_count": {
+        "type": "integer"
+       },
+       "unread_count": {
+        "type": "integer"
+       },
+       "last_message_at": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date-time"
+       },
+       "chaos": {
+        "$ref": "#/components/schemas/Chaos"
+       }
+      }
+     },
+     {
+      "$ref": "#/components/schemas/Settings"
+     }
+    ]
+   },
+   "InboxInput": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "slug": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "smtp_username": {
+      "type": "string"
+     },
+     "smtp_password": {
+      "type": "string"
+     },
+     "retention_hours": {
+      "type": "integer"
+     },
+     "clear_retention": {
+      "type": "boolean"
+     }
+    }
+   },
+   "Webhook": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "inbox_id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "url": {
+      "type": "string"
+     },
+     "secret": {
+      "type": "string"
+     },
+     "events": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "enum": [
+        "message.received"
+       ]
+      }
+     },
+     "active": {
+      "type": "boolean"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "last_status": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "last_delivery_at": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     }
+    }
+   },
+   "WebhookInput": {
+    "type": "object",
+    "properties": {
+     "url": {
+      "type": "string"
+     },
+     "events": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "enum": [
+        "message.received"
+       ]
+      }
+     },
+     "active": {
+      "type": "boolean"
+     }
+    }
+   },
+   "WebhookResult": {
+    "type": "object",
+    "properties": {
+     "status_code": {
+      "type": "integer"
+     },
+     "duration_ms": {
+      "type": "integer"
+     },
+     "error": {
+      "type": "string"
+     },
+     "response": {
+      "type": "string"
+     }
+    }
+   },
+   "WebhookDelivery": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer"
+     },
+     "webhook_id": {
+      "type": "string"
+     },
+     "event": {
+      "type": "string"
+     },
+     "attempt": {
+      "type": "integer"
+     },
+     "status_code": {
+      "type": "integer"
+     },
+     "error": {
+      "type": "string"
+     },
+     "duration_ms": {
+      "type": "integer"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "TagRule": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "inbox_id": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "uuid"
+     },
+     "query": {
+      "type": "string"
+     },
+     "tag": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "TagCount": {
+    "type": "object",
+    "properties": {
+     "tag": {
+      "type": "string"
+     },
+     "count": {
+      "type": "integer"
+     }
+    }
+   },
+   "SendRequest": {
+    "type": "object",
+    "properties": {
+     "inbox": {
+      "type": "string",
+      "description": "Inbox id or slug. Optional with an API token (its inbox) - defaults to the default inbox."
+     },
+     "from": {
+      "type": "string"
+     },
+     "to": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "cc": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "bcc": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "reply_to": {
+      "type": "string"
+     },
+     "subject": {
+      "type": "string"
+     },
+     "text": {
+      "type": "string"
+     },
+     "html": {
+      "type": "string"
+     },
+     "headers": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "tags": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "attachments": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "filename": {
+         "type": "string"
+        },
+        "content_type": {
+         "type": "string"
+        },
+        "content": {
+         "type": "string",
+         "description": "base64"
+        },
+        "content_id": {
+         "type": "string",
+         "description": "Set for inline cid: parts"
+        }
+       }
+      }
+     },
+     "raw": {
+      "type": "string",
+      "description": "A complete RFC 5322 message; overrides the other fields"
+     }
+    }
+   },
+   "HTMLCheck": {
+    "type": "object",
+    "properties": {
+     "score": {
+      "type": "number"
+     },
+     "html_bytes": {
+      "type": "integer"
+     },
+     "data_updated": {
+      "type": "string"
+     },
+     "clients": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "family": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        },
+        "score": {
+         "type": "number"
+        },
+        "platforms": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     },
+     "features": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "slug": {
+         "type": "string"
+        },
+        "title": {
+         "type": "string"
+        },
+        "url": {
+         "type": "string"
+        },
+        "category": {
+         "type": "string"
+        },
+        "supported": {
+         "type": "number"
+        },
+        "partial": {
+         "type": "number"
+        },
+        "unsupported": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "partial_in": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        },
+        "notes": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     },
+     "warnings": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "level": {
+         "type": "string",
+         "enum": [
+          "error",
+          "warning",
+          "info"
+         ]
+        },
+        "message": {
+         "type": "string"
+        },
+        "detail": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   },
+   "LinkReport": {
+    "type": "object",
+    "properties": {
+     "total": {
+      "type": "integer"
+     },
+     "broken": {
+      "type": "integer"
+     },
+     "warnings": {
+      "type": "integer"
+     },
+     "truncated": {
+      "type": "boolean"
+     },
+     "links": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "url": {
+         "type": "string"
+        },
+        "kind": {
+         "type": "string",
+         "enum": [
+          "link",
+          "image"
+         ]
+        },
+        "status": {
+         "type": "integer"
+        },
+        "ok": {
+         "type": "boolean"
+        },
+        "error": {
+         "type": "string"
+        },
+        "cached": {
+         "type": "boolean"
+        },
+        "warnings": {
+         "type": "array",
+         "items": {
+          "type": "string",
+          "enum": [
+           "localhost",
+           "insecure",
+           "unexpected-domain",
+           "blocked"
+          ]
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "DeliverabilityReport": {
+    "type": "object",
+    "properties": {
+     "pass": {
+      "type": "integer"
+     },
+     "warn": {
+      "type": "integer"
+     },
+     "fail": {
+      "type": "integer"
+     },
+     "checks": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "status": {
+         "type": "string",
+         "enum": [
+          "pass",
+          "warn",
+          "fail",
+          "info"
+         ]
+        },
+        "title": {
+         "type": "string"
+        },
+        "detail": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   },
+   "SpamReport": {
+    "type": "object",
+    "properties": {
+     "engine": {
+      "type": "string",
+      "enum": [
+       "rspamd",
+       "spamassassin"
+      ]
+     },
+     "score": {
+      "type": "number"
+     },
+     "threshold": {
+      "type": "number"
+     },
+     "is_spam": {
+      "type": "boolean"
+     },
+     "action": {
+      "type": "string"
+     },
+     "rules": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "score": {
+         "type": "number"
+        },
+        "description": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "checked_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "RelayEntry": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "integer"
+     },
+     "message_id": {
+      "type": "string"
+     },
+     "inbox_id": {
+      "type": "string"
+     },
+     "user_email": {
+      "type": "string"
+     },
+     "recipients": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "subject": {
+      "type": "string"
+     },
+     "ok": {
+      "type": "boolean"
+     },
+     "error": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "User": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "email": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "admin",
+       "member"
+      ]
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "last_login_at": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "inbox_ids": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "UserInput": {
+    "type": "object",
+    "properties": {
+     "email": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "password": {
+      "type": "string"
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "admin",
+       "member"
+      ]
+     },
+     "inbox_ids": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "Stats": {
+    "type": "object",
+    "properties": {
+     "total": {
+      "type": "integer"
+     },
+     "unread": {
+      "type": "integer"
+     },
+     "last_24h": {
+      "type": "integer"
+     },
+     "total_bytes": {
+      "type": "integer"
+     }
+    }
+   }
+  }
+ },
+ "paths": {
+  "/api/health": {
+   "get": {
+    "tags": [
+     "System"
+    ],
+    "summary": "Health check",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "OK"
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/config": {
+   "get": {
+    "tags": [
+     "System"
+    ],
+    "summary": "Public server configuration and enabled features",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "OK"
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/openapi.json": {
+   "get": {
+    "tags": [
+     "System"
+    ],
+    "summary": "This OpenAPI document",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "OK"
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/login": {
+   "post": {
+    "tags": [
+     "Auth"
+    ],
+    "summary": "Log in (sets the session cookie)",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/User"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "email": {
+          "type": "string"
+         },
+         "password": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "email",
+         "password"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/logout": {
+   "post": {
+    "tags": [
+     "Auth"
+    ],
+    "summary": "Log out",
+    "security": [],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/me": {
+   "get": {
+    "tags": [
+     "Auth"
+    ],
+    "summary": "Current user",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/User"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/password": {
+   "put": {
+    "tags": [
+     "Auth"
+    ],
+    "summary": "Change own password",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "current_password": {
+          "type": "string"
+         },
+         "new_password": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/stats": {
+   "get": {
+    "tags": [
+     "System"
+    ],
+    "summary": "Message statistics for the caller's inboxes",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Stats"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/events": {
+   "get": {
+    "tags": [
+     "System"
+    ],
+    "summary": "Live updates (Server-Sent Events)",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "text/event-stream of {type, inbox_id, data}"
+     }
+    }
+   }
+  },
+  "/api/inboxes": {
+   "get": {
+    "tags": [
+     "Inboxes"
+    ],
+    "summary": "List visible inboxes",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/Inbox"
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "Inboxes"
+    ],
+    "summary": "Create an inbox (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Inbox"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/InboxInput"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/inboxes/{id}": {
+   "get": {
+    "tags": [
+     "Inboxes"
+    ],
+    "summary": "Get an inbox",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Inbox"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   },
+   "patch": {
+    "tags": [
+     "Inboxes"
+    ],
+    "summary": "Update an inbox (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Inbox"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/InboxInput"
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "Inboxes"
+    ],
+    "summary": "Delete an inbox and its messages (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/inboxes/{id}/rotate": {
+   "post": {
+    "tags": [
+     "Inboxes"
+    ],
+    "summary": "Regenerate SMTP password and API token (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Inbox"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/inboxes/{id}/settings": {
+   "patch": {
+    "tags": [
+     "Inboxes"
+    ],
+    "summary": "Update per-inbox settings (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Inbox"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Settings"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/inboxes/{id}/chaos": {
+   "get": {
+    "tags": [
+     "Chaos"
+    ],
+    "summary": "Get SMTP fault-injection rules",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Chaos"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   },
+   "put": {
+    "tags": [
+     "Chaos"
+    ],
+    "summary": "Replace SMTP fault-injection rules",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Chaos"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Chaos"
+       }
+      }
+     }
+    },
+    "description": "Allowed for admins and for the inbox's own API token, so a test can enable faults, run, and disable them. Send {} to disable."
+   }
+  },
+  "/api/inboxes/{id}/webhooks": {
+   "get": {
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "List an inbox's webhooks (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/Webhook"
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "Create a webhook (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Webhook"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WebhookInput"
+       }
+      }
+     }
+    },
+    "description": "Deliveries are signed: X-PostDream-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<body>\")>. Failed deliveries are retried with backoff (10s, 30s, 2m, 10m, 30m)."
+   }
+  },
+  "/api/webhooks/{id}": {
+   "patch": {
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "Update a webhook (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Webhook"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WebhookInput"
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "Delete a webhook (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/webhooks/{id}/rotate": {
+   "post": {
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "Regenerate the signing secret (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Webhook"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/webhooks/{id}/test": {
+   "post": {
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "Send a signed ping now (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookResult"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/webhooks/{id}/deliveries": {
+   "get": {
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "Last 50 delivery attempts (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/WebhookDelivery"
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/rules": {
+   "get": {
+    "tags": [
+     "Tags"
+    ],
+    "summary": "List auto-tag rules (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/TagRule"
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "inbox",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Rules applying to this inbox (incl. global)"
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "Tags"
+    ],
+    "summary": "Create an auto-tag rule (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TagRule"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "inbox_id": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "null = every inbox"
+         },
+         "query": {
+          "type": "string",
+          "description": "Search syntax"
+         },
+         "tag": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "query",
+         "tag"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/rules/{id}": {
+   "delete": {
+    "tags": [
+     "Tags"
+    ],
+    "summary": "Delete an auto-tag rule (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/tags": {
+   "get": {
+    "tags": [
+     "Tags"
+    ],
+    "summary": "Tags in use with message counts",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/TagCount"
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "inbox",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Restrict to one inbox"
+     }
+    ]
+   }
+  },
+  "/api/send": {
+   "post": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Inject a message without SMTP",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MessageSummary"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SendRequest"
+       }
+      }
+     }
+    },
+    "description": "Goes through the same pipeline as SMTP (tags, rules, webhooks, spam analysis). Nothing is relayed."
+   }
+  },
+  "/api/messages": {
+   "get": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "List/search messages",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MessagePage"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "inbox",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Restrict to one inbox id"
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Search syntax: words, \"phrases\", from: to: cc: bcc: reply-to: addressed: subject: message-id: tag: is:read|unread|tagged|spam has:attachment|inline|html larger:2M smaller:500K before:/after: (yyyy/mm/dd or 2h, 3d) inbox: smtp-user: ip: header:Name[=value] spam:>5. Prefix with - or ! to negate."
+     },
+     {
+      "name": "tag",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Only messages with this tag"
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Sender contains"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "To/Cc/envelope recipient contains"
+     },
+     {
+      "name": "subject",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Subject contains"
+     },
+     {
+      "name": "since",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "RFC3339 or YYYY-MM-DD"
+     },
+     {
+      "name": "until",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "RFC3339 or YYYY-MM-DD"
+     },
+     {
+      "name": "has_attachments",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "true|false"
+     },
+     {
+      "name": "unread",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "true|false"
+     },
+     {
+      "name": "sort",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "received_at|subject|from|to|size|inbox"
+     },
+     {
+      "name": "order",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "asc|desc"
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "schema": {
+       "type": "integer"
+      },
+      "description": "1-based"
+     },
+     {
+      "name": "page_size",
+      "in": "query",
+      "schema": {
+       "type": "integer"
+      },
+      "description": "1..500 (default 50)"
+     }
+    ]
+   },
+   "delete": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Delete every message matching the filters",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "deleted": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "inbox",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Restrict to one inbox id"
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Search syntax: words, \"phrases\", from: to: cc: bcc: reply-to: addressed: subject: message-id: tag: is:read|unread|tagged|spam has:attachment|inline|html larger:2M smaller:500K before:/after: (yyyy/mm/dd or 2h, 3d) inbox: smtp-user: ip: header:Name[=value] spam:>5. Prefix with - or ! to negate."
+     },
+     {
+      "name": "tag",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Only messages with this tag"
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Sender contains"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "To/Cc/envelope recipient contains"
+     },
+     {
+      "name": "subject",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Subject contains"
+     },
+     {
+      "name": "since",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "RFC3339 or YYYY-MM-DD"
+     },
+     {
+      "name": "until",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "RFC3339 or YYYY-MM-DD"
+     },
+     {
+      "name": "has_attachments",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "true|false"
+     },
+     {
+      "name": "unread",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "true|false"
+     }
+    ]
+   }
+  },
+  "/api/messages/latest": {
+   "get": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Newest matching message, optionally waiting for it",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Message"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "inbox",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Restrict to one inbox id"
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Search syntax: words, \"phrases\", from: to: cc: bcc: reply-to: addressed: subject: message-id: tag: is:read|unread|tagged|spam has:attachment|inline|html larger:2M smaller:500K before:/after: (yyyy/mm/dd or 2h, 3d) inbox: smtp-user: ip: header:Name[=value] spam:>5. Prefix with - or ! to negate."
+     },
+     {
+      "name": "tag",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Only messages with this tag"
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Sender contains"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "To/Cc/envelope recipient contains"
+     },
+     {
+      "name": "subject",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Subject contains"
+     },
+     {
+      "name": "since",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "RFC3339 or YYYY-MM-DD"
+     },
+     {
+      "name": "until",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "RFC3339 or YYYY-MM-DD"
+     },
+     {
+      "name": "has_attachments",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "true|false"
+     },
+     {
+      "name": "unread",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "true|false"
+     },
+     {
+      "name": "wait",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Long-poll up to this duration (e.g. 30s, max 2m) until a message matches"
+     }
+    ],
+    "description": "Ideal for end-to-end tests: `GET /api/messages/latest?q=to:new-user@acme.test subject:welcome&wait=30s`. Returns 404 when nothing matched in time."
+   }
+  },
+  "/api/messages/read": {
+   "post": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Mark messages read/unread (ids, or every match of the filters)",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "updated": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "inbox",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Restrict to one inbox id"
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Search syntax: words, \"phrases\", from: to: cc: bcc: reply-to: addressed: subject: message-id: tag: is:read|unread|tagged|spam has:attachment|inline|html larger:2M smaller:500K before:/after: (yyyy/mm/dd or 2h, 3d) inbox: smtp-user: ip: header:Name[=value] spam:>5. Prefix with - or ! to negate."
+     },
+     {
+      "name": "tag",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Only messages with this tag"
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Sender contains"
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "To/Cc/envelope recipient contains"
+     },
+     {
+      "name": "subject",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Subject contains"
+     },
+     {
+      "name": "since",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "RFC3339 or YYYY-MM-DD"
+     },
+     {
+      "name": "until",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "RFC3339 or YYYY-MM-DD"
+     },
+     {
+      "name": "has_attachments",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "true|false"
+     },
+     {
+      "name": "unread",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "true|false"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ids": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "read": {
+          "type": "boolean"
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/messages/delete": {
+   "post": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Delete messages by id",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "deleted": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ids": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "ids"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/messages/tags": {
+   "post": {
+    "tags": [
+     "Tags"
+    ],
+    "summary": "Add/remove tags on several messages",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "updated": {
+           "type": "integer"
+          }
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "ids": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "add": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "remove": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "ids"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/messages/{id}": {
+   "get": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Get a message (marks it read unless ?peek=1)",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Message"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "peek",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Do not mark as read"
+     }
+    ]
+   },
+   "delete": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Delete a message",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/messages/{id}/tags": {
+   "put": {
+    "tags": [
+     "Tags"
+    ],
+    "summary": "Replace a message's tags",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "tags": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "tags"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/messages/{id}/html": {
+   "get": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "HTML body with cid: images inlined",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "html": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/messages/{id}/raw": {
+   "get": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Raw RFC 5322 source",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "message/rfc822 or text/plain"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "download",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Download as .eml"
+     }
+    ]
+   }
+  },
+  "/api/messages/{id}/attachments/{aid}": {
+   "get": {
+    "tags": [
+     "Messages"
+    ],
+    "summary": "Download an attachment",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "The attachment (always Content-Disposition: attachment)"
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "aid",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/messages/{id}/html-check": {
+   "get": {
+    "tags": [
+     "Analysis"
+    ],
+    "summary": "HTML/CSS email-client compatibility (caniemail data)",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTMLCheck"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/messages/{id}/link-check": {
+   "get": {
+    "tags": [
+     "Analysis"
+    ],
+    "summary": "Check links and images",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LinkReport"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "description": "Internal addresses are blocked unless listed in the inbox's allowed_hosts. Rate limited to 30 checks per 10 minutes per caller."
+   }
+  },
+  "/api/messages/{id}/deliverability": {
+   "get": {
+    "tags": [
+     "Analysis"
+    ],
+    "summary": "DKIM, headers, one-click unsubscribe and alignment checks",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeliverabilityReport"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/api/messages/{id}/spam": {
+   "get": {
+    "tags": [
+     "Analysis"
+    ],
+    "summary": "Spam score (SpamAssassin or Rspamd)",
+    "security": [
+     {
+      "cookieAuth": []
+     },
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SpamReport"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "refresh",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Re-run the analysis"
+     }
+    ]
+   }
+  },
+  "/api/messages/{id}/release": {
+   "post": {
+    "tags": [
+     "Relay"
+    ],
+    "summary": "Release the message to real recipients",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "recipients": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "to": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "to"
+        ]
+       }
+      }
+     }
+    },
+    "description": "Requires RELAY_SMTP_URL and the inbox's relay_recipients pattern; every recipient must match it. Audited."
+   }
+  },
+  "/api/relay/log": {
+   "get": {
+    "tags": [
+     "Relay"
+    ],
+    "summary": "Release audit log (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/RelayEntry"
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "inbox",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Restrict to one inbox"
+     }
+    ]
+   }
+  },
+  "/api/users": {
+   "get": {
+    "tags": [
+     "Users"
+    ],
+    "summary": "List users (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/User"
+         }
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "Users"
+    ],
+    "summary": "Create a user (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/User"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserInput"
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/users/{id}": {
+   "patch": {
+    "tags": [
+     "Users"
+    ],
+    "summary": "Update a user (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/User"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserInput"
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "Users"
+    ],
+    "summary": "Delete a user (admin)",
+    "security": [
+     {
+      "cookieAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Ok"
+        }
+       }
+      }
+     },
+     "default": {
+      "description": "Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  }
+ }
+}
